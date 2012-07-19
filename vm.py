@@ -9,6 +9,9 @@ import sys
 from inspect import getargspec
 
 
+MAX_LITERAL = 32768
+
+
 ## Operations
 class VM(object):
     OPCODES = [
@@ -30,21 +33,129 @@ class VM(object):
     offset = 0
 
 
+    ## Helpers
+    def reg_lit(self, a):
+        """Return register content or literal."""
+        assert a <= 32775
+        if a < MAX_LITERAL:
+            return a
+        else:
+            return self.regs[a % MAX_LITERAL]
+
+    def write_reg(self, a, b):
+        """Write b to register at address a."""
+        assert 32768 <= a <= 32775
+        self.regs[a % MAX_LITERAL] = b
+
+
     ## Individual opcode implementations
     def op_halt(self):
         """0: stop execution and terminate the program"""
         sys.exit()
+
+    def op_set(self, a, b):
+        """1: set register <a> to the value of <b>"""
+        self.write_reg(a, self.reg_lit(b))
+
+    def op_push(self, a):
+        """2: push <a> onto the stack"""
+        self.stack.append(self.reg_lit(a))
+
+    def op_pop(self, a):
+        """
+        3: remove the top element from the stack and write it into <a>;
+        empty stack = error
+        """
+        self.write_reg(a, self.stack.pop())
+
+    def op_eq(self, a, b, c):
+        """4: set <a> to 1 if <b> is equal to <c>; set it to 0 otherwise"""
+        if self.reg_lit(b) == self.reg_lit(c):
+            self.write_reg(a, 1)
+        else:
+            self.write_reg(a, 0)
+
+    def op_gt(self, a, b, c):
+        """
+        5: set <a> to 1 if <b> is greater than <c>; set it to 0 otherwise
+        """
+        if self.reg_lit(b) > self.reg_lit(c):
+            self.write_reg(a, 1)
+        else:
+            self.write_reg(a, 0)
 
     def op_jmp(self, a):
         """6: jump to <a>"""
         assert a < len(self.mem)
         self.offset = a
 
+    def op_jt(self, a, b):
+        """7: if <a> is nonzero, jump to <b>"""
+        if self.reg_lit(a) != 0:
+            self.op_jmp(b)
+
+    def op_jf(self, a, b):
+        """8: if <a> is zero, jump to <b>"""
+        if self.reg_lit(a) == 0:
+            self.op_jmp(b)
+
+    def op_add(self, a, b, c):
+        """9: assign into <a> the sum of <b> and <c> (modulo 32768)"""
+        self.write_reg(a, (self.reg_lit(b) + self.reg_lit(c)) % MAX_LITERAL)
+
+    def op_mult(self, a, b, c):
+        """10: store into <a> the product of <b> and <c> (modulo 32768)"""
+        self.write_reg(a, (self.reg_lit(b) * self.reg_lit(c)) % MAX_LITERAL)
+
+    def op_mod(self, a, b, c):
+        """11: store into <a> the remainder of <b> divided by <c>"""
+        self.write_reg(a, self.reg_lit(b) % self.reg_lit(c))
+
+    def op_and(self, a, b, c):
+        """12: stores into <a> the bitwise and of <b> and <c>"""
+        self.write_reg(a, self.reg_lit(b) & self.reg_lit(c))
+
+    def op_or(self, a, b, c):
+        """13: stores into <a> the bitwise or of <b> and <c>"""
+        self.write_reg(a, self.reg_lit(b) | self.reg_lit(c))
+
+    def op_not(self, a, b):
+        """14: stores 15-bit bitwise inverse of <b> in <a>"""
+        self.write_reg(a, (~self.reg_lit(b) & ((1 << 15) - 1)))
+
+    def op_rmem(self, a, b):
+        """15: read memory at address <b> and write it to <a>"""
+        self.write_reg(a, self.mem[self.reg_lit(b)])
+
+    def op_wmem(self, a, b):
+        """16: write the value from <b> into memory at address <a>"""
+        self.mem[self.reg_lit(a)] = self.reg_lit(b)
+
+    def op_call(self, a):
+        """
+        17: write the address of the next instruction to the stack and jump
+        to <a>
+        """
+        self.op_push(self.offset)
+        self.op_jmp(self.reg_lit(a))
+
+    def op_ret(self):
+        """
+        18: remove the top element from the stack and jump to it;
+        empty stack = halt
+        """
+        try:
+            a = self.stack.pop()
+        except IndexError:
+            # Empty stack
+            self.op_halt()
+        self.op_jmp(a)
+
     def op_out(self, a):
         """
         19: write the character represented by ascii code <a> to the terminal
         """
-        sys.stdout.write(chr(a))
+        sys.stdout.write(chr(self.reg_lit(a)))
 
     def op_noop(self):
         """21: no operation"""
@@ -65,7 +176,7 @@ class VM(object):
         args = []
 
         # Collect args.
-        if argcount:
+        for i in xrange(argcount):
             arg = self.mem[self.offset]
             args.append(arg)
             self.offset += 1
@@ -80,6 +191,8 @@ class VM(object):
         self.offset = 0
         while True:
             self.execute()
+            if self.offset == len(self.mem):  # End of file
+                break
 
 
 # Load and execute a vm

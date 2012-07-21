@@ -12,7 +12,6 @@ from inspect import getargspec
 MAX_LITERAL = 32768
 
 
-## Operations
 class VM(object):
     OPCODES = [
         'halt', 'set', 'push', 'pop', 'eq', 'gt', 'jmp', 'jt', 'jf', 'add',
@@ -22,7 +21,6 @@ class VM(object):
 
     ## Storage regions
     # Memory with 15-bit address space storing 16-bit numbers.
-    # {address: number}
     mem = []
     # 8 (16-bit) Registers
     regs = [0 for i in xrange(8)]
@@ -31,6 +29,10 @@ class VM(object):
 
     # Current memory offset. Astonishingly, start at the top.
     offset = 0
+
+    # Because we read keyboard input by the line, we need to hold on to it
+    # until we've read it all.
+    input_buffer = None
 
 
     ## Helpers
@@ -157,6 +159,33 @@ class VM(object):
         """
         sys.stdout.write(chr(self.reg_lit(a)))
 
+    def op_in(self, a):
+        """
+        20: read a character from the terminal and write its ascii code to
+        <a>; it can be assumed that once input starts, it will continue until
+        a newline is encountered; this means that you can safely read whole
+        lines from the keyboard and trust that they will be fully read
+        """
+        if self.input_buffer is None:
+            # Collect user input.
+            input = raw_input()
+
+            # Drop me into a debugger.
+            if input == 'debug':
+                import ipdb; ipdb.set_trace()
+                return
+
+            self.input_buffer = (c for c in input)
+
+        # Return char by char, finish with newline.
+        try:
+            char = self.input_buffer.next()
+        except StopIteration:
+            self.input_buffer = None  # Reset.
+            char = '\n'
+
+        self.write_reg(a, ord(char))
+
     def op_noop(self):
         """21: no operation"""
         pass
@@ -183,8 +212,6 @@ class VM(object):
 
         # Execute it.
         func(*args)
-
-
 
     def run(self):
         """Run application from memory."""

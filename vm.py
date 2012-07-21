@@ -190,6 +190,35 @@ class VM(object):
         """21: no operation"""
         pass
 
+    def disas(self, address=0, instructions=10):
+        """
+        For debugging: Disassemble <instructions> # of instructions starting
+        at address <address>.
+        """
+        # Print instructions and their args
+        for i in xrange(instructions):
+            # opcode
+            try:
+                op = self.mem[address]
+            except IndexError:
+                # At the end? Fine.
+                return
+
+            try:
+                func = getattr(self, 'op_%s' % self.OPCODES[op])
+            except IndexError:
+                print "[%s] eh? %s" % (address, op)
+                address += 1
+                continue
+
+            # arguments
+            argcount = len(getargspec(func).args) - 1  # Ignore "self".
+            args = self.mem[address + 1:address + argcount + 1]
+
+            print "[%s] %s: %s" % (address, self.OPCODES[op], str(args))
+
+            address += argcount + 1
+
     def execute(self):
         """Opcode dispatcher."""
         # Map opcode to implementation
@@ -224,7 +253,7 @@ class VM(object):
 
 # Load and execute a vm
 def main():
-    """Run this as ./vm.py <inputfile>."""
+    """Run this as ./vm.py <inputfile>. To disassemble, run ./vm.py <infile> disas"""
     try:
         infile = sys.argv[1]
     except IndexError:
@@ -240,7 +269,10 @@ def main():
             vm.mem.append(struct.unpack('<H', chunk)[0])
             chunk = f.read(2)
 
-    vm.run()
+    if len(sys.argv) >= 3 and sys.argv[2] == 'disas':
+        vm.disas(0, len(vm.mem))
+    else:
+        vm.run()
 
 
 # Run it

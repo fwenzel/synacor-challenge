@@ -4,6 +4,7 @@ Synacor challenge for OSCON 2012.
 
 Architecture description in file arch-spec.
 """
+import pdb
 import struct
 import sys
 from inspect import getargspec
@@ -168,14 +169,18 @@ class VM(object):
         """
         if self.input_buffer is None:
             # Collect user input.
-            input = raw_input()
+            command = raw_input()
 
-            # Drop me into a debugger.
-            if input == 'debug':
-                import ipdb; ipdb.set_trace()
+            # Handle override commands.
+            overrides = {
+                'debug': self.debug,
+                'fix_teleporter': self.fix_teleporter
+            }
+            if command in overrides:
+                overrides[command]()
                 return
 
-            self.input_buffer = (c for c in input)
+            self.input_buffer = (c for c in command)
 
         # Return char by char, finish with newline.
         try:
@@ -189,35 +194,6 @@ class VM(object):
     def op_noop(self):
         """21: no operation"""
         pass
-
-    def disas(self, address=0, instructions=10):
-        """
-        For debugging: Disassemble <instructions> # of instructions starting
-        at address <address>.
-        """
-        # Print instructions and their args
-        for i in xrange(instructions):
-            # opcode
-            try:
-                op = self.mem[address]
-            except IndexError:
-                # At the end? Fine.
-                return
-
-            try:
-                func = getattr(self, 'op_%s' % self.OPCODES[op])
-            except IndexError:
-                print "[%s] eh? %s" % (address, op)
-                address += 1
-                continue
-
-            # arguments
-            argcount = len(getargspec(func).args) - 1  # Ignore "self".
-            args = self.mem[address + 1:address + argcount + 1]
-
-            print "[%s] %s: %s" % (address, self.OPCODES[op], str(args))
-
-            address += argcount + 1
 
     def execute(self):
         """Opcode dispatcher."""
@@ -249,6 +225,51 @@ class VM(object):
             self.execute()
             if self.offset == len(self.mem):  # End of file
                 break
+
+    # Maintenance commands.
+    def disas(self, address=0, instructions=10):
+        """
+        For debugging: Disassemble <instructions> # of instructions starting
+        at address <address>.
+        """
+        # Print instructions and their args
+        for i in xrange(instructions):
+            # opcode
+            try:
+                op = self.mem[address]
+            except IndexError:
+                # At the end? Fine.
+                return
+
+            try:
+                func = getattr(self, 'op_%s' % self.OPCODES[op])
+            except IndexError:
+                print "[%s] eh? %s" % (address, op)
+                address += 1
+                continue
+
+            # arguments
+            argcount = len(getargspec(func).args) - 1  # Ignore "self".
+            args = self.mem[address + 1:address + argcount + 1]
+
+            print "[%s] %s: %s" % (address, self.OPCODES[op], str(args))
+
+            address += argcount + 1
+
+    def debug(self):
+        """Drop me into a debugger so I can edit the live machine."""
+        pdb.set_trace()
+
+    def fix_teleporter(self):
+        """
+        For OSCON Challenge: Fix teleporter settings to bypass ridiculous test
+        function.
+        """
+        self.mem[5511] = 21
+        self.mem[5512] = 21
+        self.regs[7] = 1
+        self.mem[5507] = 6
+        print "enter 'use teleporter' next."
 
 
 # Load and execute a vm

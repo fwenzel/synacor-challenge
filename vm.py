@@ -11,6 +11,7 @@ from inspect import getargspec
 
 
 MAX_LITERAL = 32768
+LOGFILE = 'logfile.txt'
 
 
 class VM(object):
@@ -34,6 +35,10 @@ class VM(object):
     # Because we read keyboard input by the line, we need to hold on to it
     # until we've read it all.
     input_buffer = None
+
+    # Log issued commands to logfile?
+    logging = False
+    _logfile = None
 
 
     ## Helpers
@@ -171,6 +176,8 @@ class VM(object):
             # Collect user input.
             command = raw_input()
 
+            self.log('>>> %s' % command)
+
             # Handle override commands.
             overrides = {
                 'debug': self.debug,
@@ -198,6 +205,7 @@ class VM(object):
     def execute(self):
         """Opcode dispatcher."""
         # Map opcode to implementation
+        self.startoffset = self.offset
         op = self.mem[self.offset]
         try:
             func = getattr(self, 'op_%s' % self.OPCODES[op])
@@ -216,6 +224,7 @@ class VM(object):
             self.offset += 1
 
         # Execute it.
+        self.log("[%s] %s: %s" % (self.startoffset, self.OPCODES[op], args))
         func(*args)
 
     def run(self):
@@ -225,6 +234,7 @@ class VM(object):
             self.execute()
             if self.offset == len(self.mem):  # End of file
                 break
+
 
     # Maintenance commands.
     def disas(self, address=0, instructions=10):
@@ -260,15 +270,31 @@ class VM(object):
         """Drop me into a debugger so I can edit the live machine."""
         pdb.set_trace()
 
+    def log(self, msg):
+        """Log an event to the logfile."""
+        if not self.logging:
+            return
+
+        if not self._logfile:
+            self._logfile = open('logfile.txt', 'w')
+
+        self._logfile.write("%s\n" % msg)
+
     def fix_teleporter(self):
         """
         For OSCON Challenge: Fix teleporter settings to bypass ridiculous test
         function.
         """
-        self.mem[5511] = 21
-        self.mem[5512] = 21
-        self.regs[7] = 1
-        self.mem[5507] = 6
+        # That's the right value because reg2 will contain reg8, and reg1 will
+        # contain reg2 + 1, then reg1 will be checked == 6.
+        self.regs[7] = 5
+
+        # Overwrite ridiculous test function with something that will return
+        # the bare minimum.
+        self.mem[6049:6052] = [1, 32769, 32775]  # <reg2> = <reg8>
+        self.mem[6052:6056] = [9, 32768, 32769, 1]  # <reg1> = <reg2> + 1
+        self.mem[6056] = 18  # return
+
         print "enter 'use teleporter' next."
 
 
@@ -290,10 +316,13 @@ def main():
             vm.mem.append(struct.unpack('<H', chunk)[0])
             chunk = f.read(2)
 
-    if len(sys.argv) >= 3 and sys.argv[2] == 'disas':
-        vm.disas(0, len(vm.mem))
-    else:
-        vm.run()
+    try:
+        if len(sys.argv) >= 3 and sys.argv[2] == 'disas':
+            vm.disas(0, len(vm.mem))
+        else:
+            vm.run()
+    except KeyboardInterrupt:  # Exit with Ctrl+C
+        sys.exit(1)
 
 
 # Run it

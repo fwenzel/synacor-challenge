@@ -15,11 +15,11 @@ LOGFILE = 'logfile.txt'
 
 
 class VM(object):
-    OPCODES = [
+    OPCODES = (
         'halt', 'set', 'push', 'pop', 'eq', 'gt', 'jmp', 'jt', 'jf', 'add',
         'mult', 'mod', 'and', 'or', 'not', 'rmem', 'wmem', 'call', 'ret',
         'out', 'in', 'noop'
-    ]
+    )
 
     ## Storage regions
     # Memory with 15-bit address space storing 16-bit numbers.
@@ -181,11 +181,15 @@ class VM(object):
             # Handle override commands.
             overrides = {
                 'debug': self.debug,
-                'fix_teleporter': self.fix_teleporter
+                'fix_teleporter': self.fix_teleporter,
+                'fix_orb': self.fix_orb,
+                'logging on': lambda: setattr(self, 'logging', True),
+                'logging off': lambda: setattr(self, 'logging', False)
             }
             if command in overrides:
+                sys.stdout.write('Maintenance command: %s OK\n\n' % command)
                 overrides[command]()
-                return
+                return self.op_in(a)  # Restart listening to regular input.
 
             self.input_buffer = (c for c in command)
 
@@ -282,7 +286,7 @@ class VM(object):
 
     def fix_teleporter(self):
         """
-        For OSCON Challenge: Fix teleporter settings to bypass ridiculous test
+        For Synacor Challenge: Fix teleporter settings to bypass ridiculous test
         function.
         """
         # That's the right value because reg2 will contain reg8, and reg1 will
@@ -295,10 +299,18 @@ class VM(object):
         self.mem[6052:6056] = [9, 32768, 32769, 1]  # <reg1> = <reg2> + 1
         self.mem[6056] = 18  # return
 
-        print "enter 'use teleporter' next."
+        sys.stdout.write("enter 'use teleporter' next.\n")
+
+    def fix_orb(self):
+        """For Synacor challenge: Make "orb" check to open vault always pass."""
+        # Offset 4575 checks if orb weight is 30 as expected:
+        # [4575] eq: [32768, 32768, 30]
+        # Let's assure it is, no matter what this thing actually weighs.
+        self.mem[4575:4579] = [4, 32768, 32768, 32768]  # eq
+        sys.stdout.write("enter the vault room with the orb now.\n")
 
 
-# Load and execute a vm
+# Load and execute a VM
 def main():
     """Run this as ./vm.py <inputfile>. To disassemble, run ./vm.py <infile> disas"""
     try:

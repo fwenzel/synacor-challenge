@@ -2,7 +2,7 @@
 """
 Synacor challenge for OSCON 2012.
 
-Architecture description in file arch-spec.
+Architecture description in readme.
 """
 import pdb
 import struct

@@ -5,6 +5,19 @@ From the [challenge website](https://challenge.synacor.com/):
 > This is a programming challenge, but you can use any language you like.
 > As you complete sections, come back here to check your answer codes.
 
+I hope you enjoy reading my code and learn a thing or two :)
+
+## Running it
+This solution is written in Python (2.7).
+
+There are two ways to run this.
+ 
+- execute ``vm/vm.py challenge.bin``, which will execute the VM and start running the challenge code from the beginning.
+- run ``vm/solution.sh``, which plays through the game at a really rapid pace using the standard UNIX tool ``expect``.
+
+## Contributing
+If you find any problems, please file a Github Issue!
+
 ## License
 
 This solution is (c) 2012-2014 Fred Wenzel, and licensed under an MIT license.
@@ -12,14 +25,12 @@ This solution is (c) 2012-2014 Fred Wenzel, and licensed under an MIT license.
 The challenge itself is -- presumably -- copyrighted by the orginial author
 Eric ([@ericwastl](https://twitter.com/ericwastl)) and Synacor.
 
-I hope you enjoy reading my code and learn a thing or two :)
+
+-----
 
 ## Architecture Description (from the original challenge)
 
-Synacor OSCON 2012 Challenge: In this challenge, your job is to use this
-architecture spec to create a virtual machine capable of running the included
-binary.  Along the way, you will find codes; submit these to the challenge
-website to track your progress.  Good luck!
+In this challenge, your job is to use this architecture spec to create a virtual machine capable of running the included binary.  Along the way, you will find codes; submit these to the challenge website to track your progress.  Good luck!
 
 ### architecture
 

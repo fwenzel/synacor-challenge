@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Create binary file from input string."""
+"""Create binary file from input string, for testing."""
 import struct
 
 
